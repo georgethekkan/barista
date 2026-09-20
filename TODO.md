@@ -8,11 +8,11 @@ This roadmap organizes the remaining work for Barista into prioritized tiers, st
 
 These items must be completed before Barista can reliably compile and run non-trivial Java applications.
 
-- [ ] **Classpath Construction (`src/build.rs` & `src/run.rs`)**
+- [x] **Classpath Construction (`src/build.rs` & `src/run.rs`)**
   - Replace `jar_paths.push("fix_me")` in `src/build.rs`.
   - Collect all `.jar` files in `target/dependencies/` (including transitives) or compute paths from resolved dependencies.
   - Combine dependencies with `target/classes` in `src/run.rs` using `std::env::join_paths`.
-- [ ] **Dynamic Java Source Discovery (`src/build.rs`)**
+- [x] **Dynamic Java Source Discovery (`src/build.rs`)**
   - Replace hardcoded `"src/main/java/Main.java"`.
   - Use `walkdir` to recursively locate all `*.java` files under `src/main/java/`.
 - [ ] **Directory Pre-Creation**
@@ -24,12 +24,12 @@ These items must be completed before Barista can reliably compile and run non-tr
 
 Prevent runtime panics and ensure deterministic dependency handling.
 
-- [ ] **Safe Exclusion Parsing (`src/deps.rs`)**
+- [x] **Safe Exclusion Parsing (`src/deps.rs`)**
   - Replace `.unwrap()` on `split.next()` in `to_exclusions` with proper error propagation (`Result<Vec<Exclusion>>`) to prevent crashes on invalid strings.
 - [ ] **Adopt Zero-Allocation Iterator for Manifest (`src/manifest.rs`)**
   - Change `dependency_configs(&self)` to return `impl Iterator<Item = &DependencyConfig>`.
   - Update `to_dependencies` in `src/deps.rs` to accept `impl IntoIterator<Item = &DependencyConfig>`.
-- [ ] **Slice Idioms (`&[T]` instead of `&Vec<T>`)**
+- [x] **Slice Idioms (`&[T]` instead of `&Vec<T>`)**
   - Update `src/dm.rs` (`&Vec<Dependency>` -> `&[Dependency]`).
   - Update `src/deps.rs` (`&Vec<String>` -> `&[String]`).
 - [ ] **Pass Configured Java Version to `javac`**
@@ -44,10 +44,10 @@ Polish the command-line experience and environment resilience.
 - [ ] **JDK Detection & `JAVA_HOME` Support**
   - Check `env::var("JAVA_HOME")` to find `javac` and `java` binaries before falling back to system `PATH`.
 - [ ] **Project Root / Manifest Discovery**
-  - Currently hardcoded to `./jb.toml`. Support searching parent directories upward (like Cargo) so running `barista` from subdirectories works.
+  - Currently hardcoded to `./barista.toml`. Support searching parent directories upward (like Cargo) so running `barista` from subdirectories works.
 - [ ] **Compiler Error Output Formatting**
   - When `javac` fails, print clear compiler error lines directly without raw debug formatting.
-- [ ] **Clean Tracing Output in `dm.rs`**
+- [x] **Clean Tracing Output in `dm.rs`**
   - Remove debug `println!("{:?}", art.path)` in `src/dm.rs` and replace with `tracing::debug!`.
 
 ---

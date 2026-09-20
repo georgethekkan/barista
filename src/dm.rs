@@ -10,7 +10,7 @@ use walkdir::WalkDir;
 use crate::cfg;
 use crate::deps::Dependency;
 
-pub async fn download(deps: &Vec<Dependency>) -> Result<()> {
+pub async fn download(deps: &[Dependency]) -> Result<()> {
     let downloaded_files = list_download_files(cfg::DEPENDENCIES_FOLDER).await?;
 
     let artifacts = deps
@@ -49,7 +49,7 @@ pub async fn download(deps: &Vec<Dependency>) -> Result<()> {
 async fn downloaded_file(coordinate: ArtifactCoordinate, path: PathBuf) -> Result<()> {
     let resolver = Resolver::builder().build()?;
 
-    println!("{:?}", path);
+    debug!("downloading file {:?}", path);
     let req = ResolutionRequest::new(coordinate);
 
     let resolution = resolver.resolve(&req).await?;
@@ -59,6 +59,7 @@ async fn downloaded_file(coordinate: ArtifactCoordinate, path: PathBuf) -> Resul
     let report = resolver
         .download(&resolution, &FileDestination::new(cfg::DEPENDENCIES_FOLDER))
         .await?;
+
     debug!("downloaded {} artifacts", report.artifacts.len());
     Ok(())
 }

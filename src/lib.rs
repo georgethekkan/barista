@@ -29,7 +29,7 @@ pub async fn build(args: Vec<String>) -> Result<()> {
 }
 
 pub async fn run(args: &[String]) -> Result<()> {
-    let (mf, deps) = inner_build(&args).await?;
+    let (mf, deps) = inner_build(args).await?;
 
     let main_class = args
         .first()
