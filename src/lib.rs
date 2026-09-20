@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, path::Path};
 
 use anyhow::{Context, Ok, Result, anyhow};
 
@@ -9,11 +9,16 @@ pub mod build;
 pub mod cfg;
 pub mod deps;
 pub mod dm;
+pub mod io_util;
 pub mod manifest;
 pub mod run;
 pub mod tracing;
 
 pub fn clean() -> Result<()> {
+    if !Path::new(cfg::TARGET_FOLDER).exists() {
+        return Ok(());
+    }
+
     fs::remove_dir_all(cfg::TARGET_FOLDER).context("error deleting target folder")
 }
 
@@ -32,7 +37,7 @@ pub async fn run(args: &[String]) -> Result<()> {
         .or(mf.package.main_class.as_deref())
         .ok_or_else(|| anyhow!("No main class provided and no default configured in jb.toml"))?;
 
-    run::run(deps, main_class)?;
+    run::run(deps, main_class).await?;
     Ok(())
 }
 
@@ -41,7 +46,7 @@ async fn inner_build(_args: &[String]) -> Result<(Manifest, Vec<Dependency>)> {
 
     let deps = deps::to_dependencies(mf.dependency_configs())?;
     dm::download(&deps).await?;
-    build::build(&deps, cfg::DEPENDENCIES_FOLDER)?;
+    build::build(&deps, cfg::DEPENDENCIES_FOLDER).await?;
 
     Ok((mf, deps))
 }

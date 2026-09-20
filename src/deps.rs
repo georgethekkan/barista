@@ -21,7 +21,7 @@ fn to_dependency(dp_cfg: &DependencyConfig) -> Result<Dependency> {
     use DependencyConfig::*;
     let (txt, kind, ex) = match dp_cfg {
         StringNotation(txt) => (txt.to_owned(), "none", vec![]),
-        TableNotation(dp) => (dp.id.to_owned(), "none", to_exclusions(&dp.exclusions)),
+        TableNotation(dp) => (dp.id.to_owned(), "none", to_exclusions(&dp.exclusions)?),
     };
 
     let mut split = txt.split(':');
@@ -37,17 +37,32 @@ fn to_dependency(dp_cfg: &DependencyConfig) -> Result<Dependency> {
     Dependency::new(group, id, version, kind, ex)
 }
 
-fn to_exclusions(exclusions: &Vec<String>) -> Vec<Exclusion> {
-    exclusions
+fn to_exclusions(exclusions: &[String]) -> Result<Vec<Exclusion>> {
+    let res = exclusions
         .iter()
-        .map(|it| {
-            let mut split = it.split(":");
-            Exclusion {
-                group: split.next().unwrap().to_string(),
-                id: split.next().unwrap().to_string(),
-            }
+        .map(|it| it.as_str().try_into())
+        .collect::<Result<Vec<_>>>()?;
+    Ok(res)
+}
+
+impl TryFrom<&str> for Exclusion {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let mut parts = value.split(":");
+        let (Some(group), Some(id)) = (parts.next(), parts.next()) else {
+            bail!("expected exclusion in the form `group:id`");
+        };
+
+        if parts.next().is_some() {
+            bail!("expected exclusion in the form `group:id`, got `{value}`");
+        }
+
+        Ok(Self {
+            group: group.to_owned(),
+            id: id.to_owned(),
         })
-        .collect()
+    }
 }
 
 #[derive(Debug)]

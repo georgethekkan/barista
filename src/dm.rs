@@ -1,4 +1,5 @@
-use std::{collections::HashSet, path::Path};
+use std::collections::HashSet;
+use std::path::PathBuf;
 
 use anyhow::{Ok, Result};
 use ristretto_resolver::{ArtifactCoordinate, FileDestination, ResolutionRequest, Resolver};
@@ -27,25 +28,38 @@ pub async fn download(deps: &Vec<Dependency>) -> Result<()> {
     let start = Instant::now();
     info!("Downloading {} dependencies", req_len);
 
-    let resolver = Resolver::builder().build()?;
-
+    let mut join_handles = Vec::new();
     for art in artifacts {
-        println!("{:?}", art.path);
-        let req = ResolutionRequest::new(art.coordinate.clone());
+        let coord = art.coordinate.clone();
+        let path = art.path.clone();
+        let jh = tokio::spawn(downloaded_file(coord, path));
+        join_handles.push(jh);
+    }
 
-        let resolution = resolver.resolve(&req).await?;
-        for dependency in resolution.transitive_dependencies() {
-            debug!("{}: {:?}", dependency.coordinate, dependency.status);
-        }
-        let report = resolver
-            .download(&resolution, &FileDestination::new(cfg::DEPENDENCIES_FOLDER))
-            .await?;
-        debug!("downloaded {} artifacts", report.artifacts.len());
+    for jh in join_handles {
+        jh.await??;
     }
 
     let tt = start.elapsed().as_secs();
     info!("Downloaded {} dependencies in {} seconds", req_len, tt);
 
+    Ok(())
+}
+
+async fn downloaded_file(coordinate: ArtifactCoordinate, path: PathBuf) -> Result<()> {
+    let resolver = Resolver::builder().build()?;
+
+    println!("{:?}", path);
+    let req = ResolutionRequest::new(coordinate);
+
+    let resolution = resolver.resolve(&req).await?;
+    for dependency in resolution.transitive_dependencies() {
+        debug!("{}: {:?}", dependency.coordinate, dependency.status);
+    }
+    let report = resolver
+        .download(&resolution, &FileDestination::new(cfg::DEPENDENCIES_FOLDER))
+        .await?;
+    debug!("downloaded {} artifacts", report.artifacts.len());
     Ok(())
 }
 

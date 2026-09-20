@@ -1,43 +1,39 @@
-use std::collections::HashSet;
-use std::env;
+use anyhow::Result;
 use std::path::PathBuf;
 use std::process::Command;
+use tokio::time::Instant;
 use tracing::{error, info};
 
-use crate::{cfg, deps::Dependency};
+use crate::{
+    cfg,
+    deps::Dependency,
+    io_util::{join_paths, list_files},
+};
 
-pub fn run(dependencies: Vec<Dependency>, main_class: &str) -> std::io::Result<()> {
-    // 1. Gather all of your JAR path handles
-    /*let mut classpath_paths: Vec<PathBuf> = dependencies
-        .iter()
-        .map(|filename| PathBuf::from(deps_dir).join(filename))
-        .collect();
+pub async fn run(_dependencies: Vec<Dependency>, main_class: &str) -> Result<()> {
+    let mut jar_paths = list_files(cfg::DEPENDENCIES_FOLDER).await?;
+    jar_paths.insert(0, PathBuf::from(cfg::CLASSES_FOLDER));
+    let classpath_str = join_paths(&jar_paths)?;
 
-    // 2. CRITICAL: Append the compiled classes folder path to the classpath array
-    classpath_paths.push(PathBuf::from(classes_dir));
+    let start = Instant::now();
 
-    // 3. Safely join everything using the host OS separator (':' on Unix, ';' on Windows)
-    let classpath = env::join_paths(classpath_paths)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+    info!("--------------");
 
-    let classpath_str = classpath.to_string_lossy();
-    info!("Runtime Classpath: {}", classpath_str);
-    */
-
-    let classpath_str = cfg::CLASSES_FOLDER;
-
-    // 4. Build and execute the live java process
     let mut child = Command::new("java")
         .arg("-cp")
-        .arg(&*classpath_str)
+        .arg(&classpath_str)
         .arg(main_class) // Example: "com.example.App"
         .spawn()?; // Use .spawn() to let the program interact with the terminal natively
 
-    // 5. Wait for the Java program to finish running
     let status = child.wait()?;
 
+    info!("--------------");
+
     if status.success() {
-        info!("Java application exited successfully.");
+        info!(
+            "Java application exited successfully, took {}ms",
+            start.elapsed().as_millis()
+        );
     } else {
         error!(
             "Java application exited with an error code: {:?}",

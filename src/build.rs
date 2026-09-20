@@ -1,44 +1,75 @@
 use anyhow::Result;
-use std::env;
 use std::path::PathBuf;
 use std::process::Command;
+use tokio::time::Instant;
 use tracing::{error, info};
 
-use crate::deps::Dependency;
+use crate::{
+    cfg,
+    deps::Dependency,
+    io_util::{join_paths, list_files},
+};
 
-pub fn build(dependencies: &[Dependency], base_dir: &str) -> Result<()> {
-    // 1. Map your filenames back to their complete local path handles
-    /*let jar_paths: Vec<PathBuf> = dependencies
-        .iter()
-        .map(|filename| PathBuf::from(base_dir).join(filename))
+pub async fn build(_dependencies: &[Dependency], _base_dir: &str) -> Result<()> {
+    let start = Instant::now();
+
+    let sources: Vec<PathBuf> = list_files(cfg::SRC_FOLDER)
+        .await?
+        .into_iter()
+        .filter(|p| p.extension().is_some_and(|ext| ext == "java"))
         .collect();
-    */
 
-    let mut jar_paths = Vec::new();
-    jar_paths.push("fix_me".to_string()); //TODO fix me
-    // 2. Safely join paths using the correct OS separator (':' or ';')
-    let classpath = env::join_paths(jar_paths)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+    let sources = sources_to_compile(sources).await?;
 
-    let classpath_str = classpath.to_string_lossy();
-    info!("Generated classpath: {}", classpath_str);
+    if sources.is_empty() {
+        info!("Incremental build: no sources to compile.");
+        return Ok(());
+    }
+
+    let jar_paths = list_files(cfg::DEPENDENCIES_FOLDER).await?;
+    let classpath_str = join_paths(&jar_paths)?;
 
     // 3. Build and execute the javac system process command
     let output = Command::new("javac")
         .arg("-cp")
         .arg(&*classpath_str) // Passes the formatted classpath string
-        .arg("src/main/java/Main.java") // Your target source file(s)
         .arg("-d")
-        .arg("target/classes") // Output directory for compiled .class files
+        .arg(cfg::CLASSES_FOLDER) // Output directory for compiled .class files
+        .args(&sources) // Your target source file(s)
         .output()?; // Executes the process and awaits termination
 
     // 4. Handle stderr/stdout outputs from the compiler
     if output.status.success() {
-        info!("Successfully compiled Java source files!");
+        info!(
+            "Compiled Java {} files in {}ms",
+            sources.len(),
+            start.elapsed().as_millis()
+        );
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         error!("Java compilation failed:\n{}", stderr);
     }
 
     Ok(())
+}
+
+async fn sources_to_compile(sources: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
+    let mut sources_to_compile = Vec::new();
+    for source in sources {
+        let class_str = source
+            .clone()
+            .into_string()
+            .unwrap()
+            .replace(cfg::SRC_FOLDER, cfg::CLASSES_FOLDER)
+            .replace(".java", ".class");
+        let class_file = PathBuf::from(class_str);
+
+        if !class_file.exists()
+            || source.metadata().unwrap().modified().unwrap()
+                > class_file.metadata().unwrap().modified().unwrap()
+        {
+            sources_to_compile.push(source);
+        }
+    }
+    Ok(sources_to_compile)
 }

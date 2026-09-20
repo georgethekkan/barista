@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs};
 use tracing::info;
 
+use crate::cfg;
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Manifest {
     pub package: PackageConfig,
@@ -47,7 +49,7 @@ impl Manifest {
 }
 
 pub fn load() -> Result<Manifest> {
-    let cfg_file = "./jb.toml";
+    let cfg_file = cfg::CONFIG_FILE;
     info!("Loading project manifest {}", cfg_file);
     let data = fs::read(cfg_file).context("error loading config")?;
     toml::from_slice(&data).context("error parsing input")

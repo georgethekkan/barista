@@ -8,7 +8,7 @@ async fn main() -> Result<()> {
     let start = Instant::now();
     let cli = args::parse();
 
-    tracing::init(cli.verbose);
+    tracing::init(cli.verbose, cli.quiet);
 
     debug!("Starting");
 

@@ -8,6 +8,10 @@ pub struct Cli {
     /// Enable verbose logging across all commands
     #[arg(short, long, global = true)]
     pub verbose: bool,
+
+    /// Quiet mode
+    #[arg(short, long, global = true)]
+    pub quiet: bool,
 }
 
 #[derive(Subcommand, Debug)]
