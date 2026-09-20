@@ -30,7 +30,7 @@ Prevent runtime panics and ensure deterministic dependency handling.
   - Change `dependency_configs(&self)` to return `impl Iterator<Item = &DependencyConfig>`.
   - Update `to_dependencies` in `src/deps.rs` to accept `impl IntoIterator<Item = &DependencyConfig>`.
 - [x] **Slice Idioms (`&[T]` instead of `&Vec<T>`)**
-  - Update `src/dm.rs` (`&Vec<Dependency>` -> `&[Dependency]`).
+  - Update `src/resolver.rs` (`&Vec<Dependency>` -> `&[Dependency]`).
   - Update `src/deps.rs` (`&Vec<String>` -> `&[String]`).
 - [ ] **Pass Configured Java Version to `javac`**
   - If `manifest.package.java_version` is present, pass `--release <version>` to `javac`.
@@ -47,8 +47,8 @@ Polish the command-line experience and environment resilience.
   - Currently hardcoded to `./barista.toml`. Support searching parent directories upward (like Cargo) so running `barista` from subdirectories works.
 - [ ] **Compiler Error Output Formatting**
   - When `javac` fails, print clear compiler error lines directly without raw debug formatting.
-- [x] **Clean Tracing Output in `dm.rs`**
-  - Remove debug `println!("{:?}", art.path)` in `src/dm.rs` and replace with `tracing::debug!`.
+- [x] **Clean Tracing Output in `resolver.rs`**
+  - Remove debug `println!("{:?}", art.path)` in `src/resolver.rs` and replace with `tracing::debug!`.
 
 ---
 

@@ -8,9 +8,9 @@ pub mod args;
 pub mod build;
 pub mod cfg;
 pub mod deps;
-pub mod dm;
 pub mod io_util;
 pub mod manifest;
+pub mod resolver;
 pub mod run;
 pub mod tracing;
 
@@ -45,7 +45,7 @@ async fn inner_build(_args: &[String]) -> Result<(Manifest, Vec<Dependency>)> {
     let mf = manifest::load()?;
 
     let deps = deps::to_dependencies(mf.dependency_configs())?;
-    dm::download(&deps).await?;
+    resolver::download(&deps).await?;
     build::build(&deps, cfg::DEPENDENCIES_FOLDER).await?;
 
     Ok((mf, deps))
