@@ -2,12 +2,11 @@ use std::{fs, path::Path};
 
 use anyhow::{Context, Ok, Result, anyhow};
 
-use crate::{deps::Dependency, manifest::Manifest};
+use crate::manifest::{Dependency, Manifest};
 
 pub mod args;
 pub mod build;
 pub mod cfg;
-pub mod deps;
 pub mod io_util;
 pub mod manifest;
 pub mod resolver;
@@ -35,7 +34,7 @@ pub async fn run(args: &[String]) -> Result<()> {
         .first()
         .map(String::as_str)
         .or(mf.package.main_class.as_deref())
-        .ok_or_else(|| anyhow!("No main class provided and no default configured in jb.toml"))?;
+        .ok_or_else(|| anyhow!("No main class provided and no default configured in barista.toml"))?;
 
     run::run(deps, main_class).await?;
     Ok(())
@@ -44,7 +43,7 @@ pub async fn run(args: &[String]) -> Result<()> {
 async fn inner_build(_args: &[String]) -> Result<(Manifest, Vec<Dependency>)> {
     let mf = manifest::load()?;
 
-    let deps = deps::to_dependencies(mf.dependency_configs())?;
+    let deps = mf.dependencies();
     resolver::download(&deps).await?;
     build::build(&deps, cfg::DEPENDENCIES_FOLDER).await?;
 

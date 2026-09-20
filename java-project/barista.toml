@@ -2,7 +2,7 @@
 name = "my-java-app"
 version = "0.1.0"
 main_class = "Main"
-java_version = "21"
+java_version = "25"
 
 [dependencies]
 junit-jupiter-api = "org.junit.jupiter:junit-jupiter-api:5.10.0"

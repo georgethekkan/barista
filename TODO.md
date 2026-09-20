@@ -24,14 +24,12 @@ These items must be completed before Barista can reliably compile and run non-tr
 
 Prevent runtime panics and ensure deterministic dependency handling.
 
-- [x] **Safe Exclusion Parsing (`src/deps.rs`)**
-  - Replace `.unwrap()` on `split.next()` in `to_exclusions` with proper error propagation (`Result<Vec<Exclusion>>`) to prevent crashes on invalid strings.
-- [ ] **Adopt Zero-Allocation Iterator for Manifest (`src/manifest.rs`)**
-  - Change `dependency_configs(&self)` to return `impl Iterator<Item = &DependencyConfig>`.
-  - Update `to_dependencies` in `src/deps.rs` to accept `impl IntoIterator<Item = &DependencyConfig>`.
+- [x] **Safe Exclusion Parsing (`src/manifest.rs`)**
+  - Replaced `.unwrap()` with `TryFrom<String> for Exclusion` returning `Result`.
+- [x] **Direct Deserialization for Manifest (`src/manifest.rs`)**
+  - Deserialized directly into `BTreeMap<String, Dependency>` via `#[serde(try_from = "...")]`, eliminating `src/deps.rs`.
 - [x] **Slice Idioms (`&[T]` instead of `&Vec<T>`)**
-  - Update `src/resolver.rs` (`&Vec<Dependency>` -> `&[Dependency]`).
-  - Update `src/deps.rs` (`&Vec<String>` -> `&[String]`).
+  - Updated `src/resolver.rs` (`&Vec<Dependency>` -> `&[Dependency]`).
 - [ ] **Pass Configured Java Version to `javac`**
   - If `manifest.package.java_version` is present, pass `--release <version>` to `javac`.
 

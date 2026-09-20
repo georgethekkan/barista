@@ -8,7 +8,7 @@ use tracing::{debug, info};
 use walkdir::WalkDir;
 
 use crate::cfg;
-use crate::deps::Dependency;
+use crate::manifest::Dependency;
 
 pub async fn download(deps: &[Dependency]) -> Result<()> {
     let downloaded_files = list_download_files(cfg::DEPENDENCIES_FOLDER).await?;

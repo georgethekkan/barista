@@ -6,8 +6,8 @@ use tracing::{error, info};
 
 use crate::{
     cfg,
-    deps::Dependency,
     io_util::{join_paths, list_files},
+    manifest::Dependency,
 };
 
 pub async fn run(_dependencies: Vec<Dependency>, main_class: &str) -> Result<()> {
