@@ -5,8 +5,20 @@ use tracing::info;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Manifest {
+    pub package: PackageConfig,
     // Maps dependency name (e.g., "junit-jupiter-api") to its configuration format
+    #[serde(default)]
     pub dependencies: BTreeMap<String, DependencyConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct PackageConfig {
+    pub name: String,
+    pub version: String,
+    #[serde(default)]
+    pub main_class: Option<String>,
+    #[serde(default)]
+    pub java_version: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -36,7 +48,7 @@ impl Manifest {
 
 pub fn load() -> Result<Manifest> {
     let cfg_file = "./jb.toml";
-    info!("Loading propject manifest {}", cfg_file);
+    info!("Loading project manifest {}", cfg_file);
     let data = fs::read(cfg_file).context("error loading config")?;
     toml::from_slice(&data).context("error parsing input")
 }
@@ -52,6 +64,12 @@ mod tests {
     #[test]
     fn test_parse_java_dependencies() {
         let toml_content = r#"
+            [package]
+            name = "my-java-app"
+            version = "0.1.0"
+            main_class = "Main"
+            java_version = "21"
+
             [dependencies]
             junit-jupiter-api = "org.junit.jupiter:junit-jupiter-api:5.10.0"
             slf4j-api = { id = "org.slf4j:slf4j-api:2.0.18", exclusions = ["something:something"] }
@@ -59,6 +77,11 @@ mod tests {
 
         // Ensure parsing passes without throwing errors
         let manifest: Manifest = toml::from_str(toml_content).unwrap();
+
+        assert_eq!(manifest.package.name, "my-java-app");
+        assert_eq!(manifest.package.version, "0.1.0");
+        assert_eq!(manifest.package.main_class.as_deref(), Some("Main"));
+        assert_eq!(manifest.package.java_version.as_deref(), Some("21"));
 
         // 1. Verify junit-jupiter-api parsed into the String variant
         match manifest.dependencies.get("junit-jupiter-api") {

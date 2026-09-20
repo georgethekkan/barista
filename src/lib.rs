@@ -1,8 +1,8 @@
 use std::fs;
 
-use anyhow::{Context, Ok, Result};
+use anyhow::{Context, Ok, Result, anyhow};
 
-use crate::deps::Dependency;
+use crate::{deps::Dependency, manifest::Manifest};
 
 pub mod args;
 pub mod build;
@@ -18,23 +18,30 @@ pub fn clean() -> Result<()> {
 }
 
 pub async fn build(args: Vec<String>) -> Result<()> {
-    let _deps = inner_build(&args).await?;
+    let (_mf, _deps) = inner_build(&args).await?;
 
     Ok(())
 }
 
-pub async fn run(args: Vec<String>) -> Result<()> {
-    let deps = inner_build(&args).await?;
-    run::run(deps, args.get(0).unwrap())?;
+pub async fn run(args: &[String]) -> Result<()> {
+    let (mf, deps) = inner_build(&args).await?;
+
+    let main_class = args
+        .first()
+        .map(String::as_str)
+        .or(mf.package.main_class.as_deref())
+        .ok_or_else(|| anyhow!("No main class provided and no default configured in jb.toml"))?;
+
+    run::run(deps, main_class)?;
     Ok(())
 }
 
-async fn inner_build(_args: &[String]) -> Result<Vec<Dependency>> {
+async fn inner_build(_args: &[String]) -> Result<(Manifest, Vec<Dependency>)> {
     let mf = manifest::load()?;
 
     let deps = deps::to_dependencies(mf.dependency_configs())?;
     dm::download(&deps).await?;
     build::build(&deps, cfg::DEPENDENCIES_FOLDER)?;
 
-    Ok(deps)
+    Ok((mf, deps))
 }

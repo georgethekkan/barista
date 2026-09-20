@@ -1,4 +1,4 @@
-use clap::error::Result;
+use anyhow::Result;
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
@@ -15,7 +15,7 @@ pub fn build(dependencies: &[Dependency], base_dir: &str) -> Result<()> {
     */
 
     let mut jar_paths = Vec::new();
-    jar_paths.push("value".to_string());
+    jar_paths.push("fix_me".to_string()); //TODO fix me
     // 2. Safely join paths using the correct OS separator (':' or ';')
     let classpath = env::join_paths(jar_paths)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
