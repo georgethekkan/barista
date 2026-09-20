@@ -1,0 +1,3 @@
+[dependencies]
+junit-jupiter-api = "org.junit.jupiter:junit-jupiter-api:5.10.0"
+slf4j-api = { id = "org.slf4j:slf4j-api:2.0.18", exclusions = ["something:something"] }
