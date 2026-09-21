@@ -1,9 +1,9 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
 use tokio::time::Instant;
-use tracing::{error, info};
+use tracing::{info, instrument};
 
 use crate::{
     cfg,
@@ -11,24 +11,57 @@ use crate::{
     manifest::Dependency,
 };
 
+#[instrument(name = "build_main", skip_all)]
 pub async fn build(_dependencies: &[Dependency], _base_dir: &str) -> Result<()> {
+    inner_build(
+        cfg::SRC_FOLDER,
+        cfg::CLASSES_FOLDER,
+        &[cfg::DEPENDENCIES_FOLDER],
+        &[],
+    )
+    .await
+}
+
+#[instrument(name = "build_test", skip_all)]
+pub async fn build_test(_dependencies: &[Dependency], _base_dir: &str) -> Result<()> {
+    inner_build(
+        cfg::TEST_SRC_FOLDER,
+        cfg::TEST_CLASSES_FOLDER,
+        &[cfg::TEST_DEPENDENCIES_FOLDER, cfg::DEPENDENCIES_FOLDER],
+        &[cfg::CLASSES_FOLDER],
+    )
+    .await
+}
+
+async fn inner_build(
+    src_folder: &str,
+    cls_folder: &str,
+    jar_dirs: &[&str],
+    class_dirs: &[&str],
+) -> Result<()> {
     let start = Instant::now();
 
-    let sources: Vec<PathBuf> = list_files(cfg::SRC_FOLDER)
+    let sources: Vec<PathBuf> = list_files(src_folder)
         .await?
         .into_iter()
         .filter(|p| p.extension().is_some_and(|ext| ext == "java"))
         .collect();
 
-    let sources = sources_to_compile(sources).await?;
+    let sources = sources_to_compile(sources, src_folder, cls_folder).await?;
 
     if sources.is_empty() {
         info!("Incremental build: no sources to compile.");
         return Ok(());
     }
 
-    let mut jar_paths = list_files(cfg::DEPENDENCIES_FOLDER).await?;
-    jar_paths.insert(0, PathBuf::from(cfg::CLASSES_FOLDER));
+    let mut jar_paths = Vec::new();
+    jar_paths.push(PathBuf::from(cls_folder));
+    for dir in class_dirs {
+        jar_paths.push(PathBuf::from(dir));
+    }
+    for dir in jar_dirs {
+        jar_paths.extend(list_files(dir).await?);
+    }
     let classpath_str = join_paths(&jar_paths)?;
 
     // 3. Build and execute the javac system process command
@@ -36,7 +69,7 @@ pub async fn build(_dependencies: &[Dependency], _base_dir: &str) -> Result<()> 
         .arg("-cp")
         .arg(classpath_str.as_str()) // Passes the formatted classpath string
         .arg("-d")
-        .arg(cfg::CLASSES_FOLDER) // Output directory for compiled .class files
+        .arg(cls_folder) // Output directory for compiled .class files
         .args(&sources) // Your target source file(s)
         .output()?; // Executes the process and awaits termination
 
@@ -47,18 +80,21 @@ pub async fn build(_dependencies: &[Dependency], _base_dir: &str) -> Result<()> 
             sources.len(),
             start.elapsed().as_millis()
         );
+        Ok(())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        error!("Java compilation failed:\n{}", stderr);
+        bail!("Java compilation failed:\n{}", stderr);
     }
-
-    Ok(())
 }
 
-async fn sources_to_compile(sources: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
+async fn sources_to_compile(
+    sources: Vec<PathBuf>,
+    src_folder: &str,
+    cls_folder: &str,
+) -> Result<Vec<PathBuf>> {
     let mut to_compile = Vec::new();
-    let src_dir = Path::new(cfg::SRC_FOLDER);
-    let class_dir = Path::new(cfg::CLASSES_FOLDER);
+    let src_dir = Path::new(src_folder);
+    let class_dir = Path::new(cls_folder);
 
     let now = SystemTime::now();
 

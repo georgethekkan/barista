@@ -11,12 +11,15 @@ use tracing::info;
 
 use crate::cfg;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Manifest {
     pub package: PackageConfig,
     // Maps dependency name (e.g., "junit-jupiter-api") to its resolved Dependency
     #[serde(default)]
     pub dependencies: BTreeMap<String, Dependency>,
+
+    #[serde(default, rename = "dev-dependencies")]
+    pub dev_dependencies: BTreeMap<String, Dependency>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -144,6 +147,10 @@ impl Manifest {
     pub fn dependencies(&self) -> Vec<Dependency> {
         self.dependencies.values().cloned().collect()
     }
+
+    pub fn dev_dependencies(&self) -> Vec<Dependency> {
+        self.dev_dependencies.values().cloned().collect()
+    }
 }
 
 pub fn load() -> Result<Manifest> {
@@ -180,7 +187,7 @@ mod tests {
         assert_eq!(manifest.package.name, "my-java-app");
         assert_eq!(manifest.package.version, "0.1.0");
         assert_eq!(manifest.package.main_class.as_deref(), Some("Main"));
-        assert_eq!(manifest.package.java_version.as_deref(), Some("21"));
+        assert_eq!(manifest.package.java_version.as_deref(), Some("25"));
 
         // 1. Verify junit-jupiter-api parsed directly into Dependency
         let junit = manifest.dependencies.get("junit-jupiter-api").unwrap();

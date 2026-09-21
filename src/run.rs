@@ -1,8 +1,8 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use std::path::PathBuf;
 use std::process::Command;
 use tokio::time::Instant;
-use tracing::{error, info};
+use tracing::info;
 
 use crate::{
     cfg,
@@ -34,12 +34,8 @@ pub async fn run(_dependencies: Vec<Dependency>, main_class: &str) -> Result<()>
             "Java application exited successfully, took {}ms",
             start.elapsed().as_millis()
         );
+        Ok(())
     } else {
-        error!(
-            "Java application exited with an error code: {:?}",
-            status.code()
-        );
+        bail!("Java application exited with error code: {:?}", status.code());
     }
-
-    Ok(())
 }

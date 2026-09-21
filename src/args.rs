@@ -31,6 +31,5 @@ pub enum Commands {
 }
 
 pub fn parse() -> Cli {
-    let cli = Cli::parse();
-    cli
+    Cli::parse()
 }

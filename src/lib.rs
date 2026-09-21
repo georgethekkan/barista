@@ -11,6 +11,7 @@ pub mod io_util;
 pub mod manifest;
 pub mod resolver;
 pub mod run;
+mod test_runner;
 pub mod tracing;
 
 pub fn clean() -> Result<()> {
@@ -23,6 +24,7 @@ pub fn clean() -> Result<()> {
 
 pub async fn build(args: Vec<String>) -> Result<()> {
     let (_mf, _deps) = inner_build(&args).await?;
+    test_runner::run().await?;
 
     Ok(())
 }
@@ -34,7 +36,9 @@ pub async fn run(args: &[String]) -> Result<()> {
         .first()
         .map(String::as_str)
         .or(mf.package.main_class.as_deref())
-        .ok_or_else(|| anyhow!("No main class provided and no default configured in barista.toml"))?;
+        .ok_or_else(|| {
+            anyhow!("No main class provided and no default configured in barista.toml")
+        })?;
 
     run::run(deps, main_class).await?;
     Ok(())
@@ -44,8 +48,15 @@ async fn inner_build(_args: &[String]) -> Result<(Manifest, Vec<Dependency>)> {
     let mf = manifest::load()?;
 
     let deps = mf.dependencies();
-    resolver::download(&deps).await?;
+    let dev_deps = mf.dev_dependencies();
+
+    tokio::try_join!(
+        resolver::download(&deps),
+        resolver::download_test_dependencies(&dev_deps),
+    )?;
+
     build::build(&deps, cfg::DEPENDENCIES_FOLDER).await?;
+    build::build_test(&dev_deps, cfg::TEST_DEPENDENCIES_FOLDER).await?;
 
     Ok((mf, deps))
 }
