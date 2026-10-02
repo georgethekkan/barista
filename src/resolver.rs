@@ -21,7 +21,7 @@ pub async fn download(deps: &[ResolvedDependency]) -> Result<()> {
 }
 
 async fn inner_download(deps: &[ResolvedDependency], target_folder: &str) -> Result<()> {
-    let downloaded_files = list_download_files(target_folder).await?;
+    let downloaded_files = list_download_files(target_folder)?;
 
     let artifacts: Vec<ResolvedDependency> = deps
         .iter()
@@ -92,17 +92,13 @@ async fn downloaded_file(coordinate: ArtifactCoordinate, path: PathBuf, target_f
     Ok(transitive_deps.len())
 }
 
-pub async fn list_download_files(path: &str) -> Result<HashSet<String>> {
-    let path = path.to_string();
-    let file_names = tokio::task::spawn_blocking(move || {
-        WalkDir::new(path)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-            .filter_map(|e| e.file_name().to_os_string().into_string().ok())
-            .collect::<HashSet<_>>()
-    })
-    .await?;
+pub fn list_download_files(path: &str) -> Result<HashSet<String>> {
+    let file_names = WalkDir::new(path)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| e.file_type().is_file())
+        .filter_map(|e| e.file_name().to_os_string().into_string().ok())
+        .collect();
 
     Ok(file_names)
 }

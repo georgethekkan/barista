@@ -11,7 +11,7 @@ use crate::io_util::{join_paths, list_files};
 use crate::workspace::Workspace;
 
 #[instrument(name = "build_main", skip_all)]
-pub async fn build(ws: &Workspace) -> Result<()> {
+pub fn build(ws: &Workspace) -> Result<()> {
     inner_build(
         ws,
         cfg::SRC_FOLDER,
@@ -19,11 +19,10 @@ pub async fn build(ws: &Workspace) -> Result<()> {
         &[cfg::DEPENDENCIES_FOLDER],
         &[],
     )
-    .await
 }
 
 #[instrument(name = "build_test", skip_all)]
-pub async fn build_test(ws: &Workspace) -> Result<()> {
+pub fn build_test(ws: &Workspace) -> Result<()> {
     inner_build(
         ws,
         cfg::TEST_SRC_FOLDER,
@@ -31,10 +30,9 @@ pub async fn build_test(ws: &Workspace) -> Result<()> {
         &[cfg::TEST_DEPENDENCIES_FOLDER, cfg::DEPENDENCIES_FOLDER],
         &[cfg::CLASSES_FOLDER],
     )
-    .await
 }
 
-async fn inner_build(
+fn inner_build(
     ws: &Workspace,
     src_folder: &str,
     cls_folder: &str,
@@ -47,8 +45,7 @@ async fn inner_build(
             Path::new(cls_folder),
             jar_dirs,
             class_dirs,
-        )
-        .await;
+        );
     }
 
     // Resolve compile order and execute sequentially
@@ -62,14 +59,14 @@ async fn inner_build(
             member_src.display(),
             member_cls.display(),
         );
-        compile_target(&member_src, member_cls, jar_dirs, class_dirs).await?;
+        compile_target(&member_src, member_cls, jar_dirs, class_dirs)?;
     }
 
     Ok(())
 }
 
 #[instrument(skip_all)]
-async fn compile_target(
+fn compile_target(
     src_dir: &Path,
     cls_dir: &Path,
     jar_dirs: &[&str],
@@ -81,13 +78,12 @@ async fn compile_target(
         return Ok(());
     }
 
-    let sources: Vec<PathBuf> = list_files(src_dir)
-        .await?
+    let sources: Vec<PathBuf> = list_files(src_dir)?
         .into_iter()
         .filter(|p| p.extension().is_some_and(|ext| ext == "java"))
         .collect();
 
-    let sources = sources_to_compile(sources, src_dir, cls_dir).await?;
+    let sources = sources_to_compile(sources, src_dir, cls_dir)?;
 
     if sources.is_empty() {
         info!("Incremental build: no sources to compile in {}", src_dir.display());
@@ -103,7 +99,7 @@ async fn compile_target(
         jar_paths.push(PathBuf::from(dir));
     }
     for dir in jar_dirs {
-        jar_paths.extend(list_files(dir).await?);
+        jar_paths.extend(list_files(dir)?);
     }
     let classpath_str = join_paths(&jar_paths)?;
 
@@ -129,7 +125,7 @@ async fn compile_target(
     }
 }
 
-async fn sources_to_compile(
+fn sources_to_compile(
     sources: Vec<PathBuf>,
     src_dir: &Path,
     class_dir: &Path,

@@ -4,18 +4,14 @@ use anyhow::{Ok, Result};
 use tracing::debug;
 use walkdir::WalkDir;
 
-pub async fn list_files<P: Into<PathBuf>>(path: P) -> Result<Vec<PathBuf>> {
-    let path = path.into();
-    let file_names = tokio::task::spawn_blocking(move || {
-        WalkDir::new(path)
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|entry| entry.file_type().is_file())
-            .map(|entry| entry.into_path())
-            .collect::<Vec<_>>()
-    })
-    .await?;
-    Ok(file_names)
+pub fn list_files<P: AsRef<std::path::Path>>(path: P) -> Result<Vec<PathBuf>> {
+    let files = WalkDir::new(path)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_file())
+        .map(|entry| entry.into_path())
+        .collect();
+    Ok(files)
 }
 
 pub fn join_paths(paths: &[PathBuf]) -> Result<String> {

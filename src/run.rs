@@ -10,8 +10,8 @@ use crate::{
     workspace::Workspace,
 };
 
-pub async fn run(main_class: &str, app_args: &[String], _ws: &Workspace) -> Result<()> {
-    let mut jar_paths = list_files(cfg::DEPENDENCIES_FOLDER).await?;
+pub fn run(main_class: &str, app_args: &[String], _ws: &Workspace) -> Result<()> {
+    let mut jar_paths = list_files(cfg::DEPENDENCIES_FOLDER)?;
     jar_paths.insert(0, PathBuf::from(cfg::CLASSES_FOLDER));
     let classpath_str = join_paths(&jar_paths)?;
 

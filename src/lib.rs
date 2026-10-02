@@ -23,13 +23,13 @@ pub fn clean() -> Result<()> {
     fs::remove_dir_all(cfg::TARGET_FOLDER).context("error deleting target folder")
 }
 
-pub async fn load_workspace(path: &str) -> Result<Workspace> {
+pub fn load_workspace(path: &str) -> Result<Workspace> {
     Workspace::from_root_dir(path, cfg::CONFIG_FILE)
 }
 
 pub async fn build() -> Result<()> {
     let ws = inner_build().await?;
-    test_runner::run(&ws).await?;
+    test_runner::run(&ws)?;
 
     Ok(())
 }
@@ -48,12 +48,12 @@ pub async fn run(bin_args: &[String]) -> Result<()> {
         }
     };
 
-    run::run(main_class, app_args, &ws).await?;
+    run::run(main_class, app_args, &ws)?;
     Ok(())
 }
 
 async fn inner_build() -> Result<Workspace> {
-    let ws = load_workspace(cfg::ROOT_DIR).await?;
+    let ws = load_workspace(cfg::ROOT_DIR)?;
 
     let main_deps = ws.all_external_dependencies();
     let dev_deps = ws.all_external_dev_dependencies();
@@ -64,8 +64,8 @@ async fn inner_build() -> Result<Workspace> {
     )?;
 
     // Trigger compilation steps
-    build::build(&ws).await?;
-    build::build_test(&ws).await?;
+    build::build(&ws)?;
+    build::build_test(&ws)?;
 
     Ok(ws)
 }
