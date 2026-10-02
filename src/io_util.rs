@@ -37,3 +37,14 @@ pub fn join_paths(paths: &[PathBuf]) -> Result<String> {
 
     Ok(classpath_str.to_string())
 }
+
+pub fn build_classpath(class_dirs: &[&std::path::Path], jar_dirs: &[&std::path::Path]) -> Result<String> {
+    let mut paths = Vec::new();
+    for dir in class_dirs {
+        paths.push(dir.to_path_buf());
+    }
+    for dir in jar_dirs {
+        paths.extend(list_files(dir)?);
+    }
+    join_paths(&paths)
+}

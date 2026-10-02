@@ -16,15 +16,17 @@ pub mod tracing;
 pub mod workspace;
 
 pub fn clean() -> Result<()> {
-    if !Path::new(cfg::TARGET_FOLDER).exists() {
+    let ws = load_workspace(".")?;
+    let target = ws.target_dir();
+    if !target.exists() {
         return Ok(());
     }
 
-    fs::remove_dir_all(cfg::TARGET_FOLDER).context("error deleting target folder")
+    fs::remove_dir_all(&target).context("error deleting target folder")
 }
 
-pub fn load_workspace(path: &str) -> Result<Workspace> {
-    Workspace::from_root_dir(path, cfg::CONFIG_FILE)
+pub fn load_workspace<P: AsRef<Path>>(path: P) -> Result<Workspace> {
+    Workspace::from_root_dir(path, manifest::MANIFEST_FILE)
 }
 
 pub async fn build() -> Result<()> {
@@ -53,14 +55,14 @@ pub async fn run(bin_args: &[String]) -> Result<()> {
 }
 
 async fn inner_build() -> Result<Workspace> {
-    let ws = load_workspace(cfg::ROOT_DIR)?;
+    let ws = load_workspace(".")?;
 
     let main_deps = ws.all_external_dependencies();
     let dev_deps = ws.all_external_dev_dependencies();
 
     tokio::try_join!(
-        resolver::download(&main_deps),
-        resolver::download_test_dependencies(&dev_deps),
+        resolver::download(&main_deps, &ws.dependencies_dir()),
+        resolver::download(&dev_deps, &ws.test_dependencies_dir()),
     )?;
 
     // Trigger compilation steps

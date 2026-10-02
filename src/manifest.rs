@@ -7,7 +7,6 @@ use std::{
 };
 use tracing::info;
 
-use crate::cfg;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Manifest {
@@ -85,10 +84,12 @@ pub fn normalize_path(path: &Path) -> PathBuf {
     normalized
 }
 
-pub fn load() -> Result<Manifest> {
-    let cfg_file = cfg::CONFIG_FILE;
-    info!("Loading project manifest {}", cfg_file);
-    let data = fs::read(cfg_file).context("error loading config")?;
+pub const MANIFEST_FILE: &str = "barista.toml";
+
+pub fn load<P: AsRef<Path>>(path: P) -> Result<Manifest> {
+    let path = path.as_ref();
+    info!("Loading project manifest {}", path.display());
+    let data = fs::read(path).context("error loading config")?;
     toml::from_slice(&data).context("error parsing input")
 }
 

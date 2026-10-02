@@ -6,17 +6,16 @@ use std::time::SystemTime;
 use tokio::time::Instant;
 use tracing::{info, instrument};
 
-use crate::cfg;
-use crate::io_util::{join_paths, list_files};
+use crate::io_util::{build_classpath, list_files};
 use crate::workspace::Workspace;
 
 #[instrument(name = "build_main", skip_all)]
 pub fn build(ws: &Workspace) -> Result<()> {
     inner_build(
         ws,
-        cfg::SRC_FOLDER,
-        cfg::CLASSES_FOLDER,
-        &[cfg::DEPENDENCIES_FOLDER],
+        "src/main/java",
+        &ws.classes_dir(),
+        &[&ws.dependencies_dir()],
         &[],
     )
 }
@@ -25,41 +24,36 @@ pub fn build(ws: &Workspace) -> Result<()> {
 pub fn build_test(ws: &Workspace) -> Result<()> {
     inner_build(
         ws,
-        cfg::TEST_SRC_FOLDER,
-        cfg::TEST_CLASSES_FOLDER,
-        &[cfg::TEST_DEPENDENCIES_FOLDER, cfg::DEPENDENCIES_FOLDER],
-        &[cfg::CLASSES_FOLDER],
+        "src/test/java",
+        &ws.test_classes_dir(),
+        &[&ws.test_dependencies_dir(), &ws.dependencies_dir()],
+        &[&ws.classes_dir()],
     )
 }
 
 fn inner_build(
     ws: &Workspace,
-    src_folder: &str,
-    cls_folder: &str,
-    jar_dirs: &[&str],
-    class_dirs: &[&str],
+    rel_src: &str,
+    cls_dir: &Path,
+    jar_dirs: &[&Path],
+    class_dirs: &[&Path],
 ) -> Result<()> {
     if ws.members.is_empty() {
-        return compile_target(
-            Path::new(src_folder),
-            Path::new(cls_folder),
-            jar_dirs,
-            class_dirs,
-        );
+        let src_dir = ws.root_dir.join(rel_src);
+        return compile_target(&src_dir, cls_dir, jar_dirs, class_dirs);
     }
 
     // Resolve compile order and execute sequentially
     let compile_order = ws.resolve_compile_order();
     for member in compile_order {
-        let member_src = member.path.join(src_folder);
-        let member_cls = Path::new(cls_folder);
+        let member_src = member.path.join(rel_src);
         info!(
             "Compiling member: {}, src_folder: {}, target_folder: {}",
             member.name,
             member_src.display(),
-            member_cls.display(),
+            cls_dir.display(),
         );
-        compile_target(&member_src, member_cls, jar_dirs, class_dirs)?;
+        compile_target(&member_src, cls_dir, jar_dirs, class_dirs)?;
     }
 
     Ok(())
@@ -69,8 +63,8 @@ fn inner_build(
 fn compile_target(
     src_dir: &Path,
     cls_dir: &Path,
-    jar_dirs: &[&str],
-    class_dirs: &[&str],
+    jar_dirs: &[&Path],
+    class_dirs: &[&Path],
 ) -> Result<()> {
     let start = Instant::now();
 
@@ -93,15 +87,9 @@ fn compile_target(
     // Ensure output classes directory exists before compiling
     fs::create_dir_all(cls_dir)?;
 
-    let mut jar_paths = Vec::new();
-    jar_paths.push(cls_dir.to_path_buf());
-    for dir in class_dirs {
-        jar_paths.push(PathBuf::from(dir));
-    }
-    for dir in jar_dirs {
-        jar_paths.extend(list_files(dir)?);
-    }
-    let classpath_str = join_paths(&jar_paths)?;
+    let mut all_class_dirs = vec![cls_dir];
+    all_class_dirs.extend_from_slice(class_dirs);
+    let classpath_str = build_classpath(&all_class_dirs, jar_dirs)?;
 
     // Build and execute the javac command
     let output = Command::new("javac")

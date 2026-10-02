@@ -94,6 +94,34 @@ impl Workspace {
         })
     }
 
+    pub fn target_dir(&self) -> PathBuf {
+        self.root_dir.join("target")
+    }
+
+    pub fn classes_dir(&self) -> PathBuf {
+        self.target_dir().join("classes")
+    }
+
+    pub fn test_classes_dir(&self) -> PathBuf {
+        self.target_dir().join("test-classes")
+    }
+
+    pub fn dependencies_dir(&self) -> PathBuf {
+        self.target_dir().join("dependencies")
+    }
+
+    pub fn test_dependencies_dir(&self) -> PathBuf {
+        self.target_dir().join("test-dependencies")
+    }
+
+    pub fn src_dir(&self) -> PathBuf {
+        self.root_dir.join("src/main/java")
+    }
+
+    pub fn test_src_dir(&self) -> PathBuf {
+        self.root_dir.join("src/test/java")
+    }
+
     /// Returns all unique external runtime dependencies across the root and members
     pub fn all_external_dependencies(&self) -> Vec<ResolvedDependency> {
         extract_unique_external(

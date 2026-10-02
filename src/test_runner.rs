@@ -1,23 +1,15 @@
 use anyhow::{Result, bail};
-use std::path::PathBuf;
 use std::process::Command;
 use tokio::time::Instant;
 use tracing::info;
 
-use crate::{
-    cfg,
-    io_util::{join_paths, list_files},
-    workspace::Workspace,
-};
+use crate::{io_util::build_classpath, workspace::Workspace};
 
-pub fn run(_ws: &Workspace) -> Result<()> {
-    let mut test_deps = list_files(cfg::TEST_DEPENDENCIES_FOLDER)?;
-    test_deps.insert(0, PathBuf::from(cfg::TEST_CLASSES_FOLDER));
-    test_deps.insert(0, PathBuf::from(cfg::CLASSES_FOLDER));
-    let jar_paths = list_files(cfg::DEPENDENCIES_FOLDER)?;
-    test_deps.extend(jar_paths);
-
-    let classpath_str = join_paths(&test_deps)?;
+pub fn run(ws: &Workspace) -> Result<()> {
+    let classpath_str = build_classpath(
+        &[&ws.test_classes_dir(), &ws.classes_dir()],
+        &[&ws.test_dependencies_dir(), &ws.dependencies_dir()],
+    )?;
 
     let start = Instant::now();
 
