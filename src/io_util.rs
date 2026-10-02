@@ -4,8 +4,8 @@ use anyhow::{Ok, Result};
 use tracing::debug;
 use walkdir::WalkDir;
 
-pub async fn list_files(path: &str) -> Result<Vec<PathBuf>> {
-    let path = PathBuf::from(path);
+pub async fn list_files<P: Into<PathBuf>>(path: P) -> Result<Vec<PathBuf>> {
+    let path = path.into();
     let file_names = tokio::task::spawn_blocking(move || {
         WalkDir::new(path)
             .into_iter()
@@ -19,8 +19,21 @@ pub async fn list_files(path: &str) -> Result<Vec<PathBuf>> {
 }
 
 pub fn join_paths(paths: &[PathBuf]) -> Result<String> {
-    //Safely join paths using the correct OS separator (':' or ';')
-    let classpath = env::join_paths(paths)
+    // Safely join paths using the correct OS separator (':' or ';')
+    // Filter to existing directories and .jar files to avoid passing checksums/poms to classpath
+    let valid_paths: Vec<_> = paths
+        .iter()
+        .filter(|p| {
+            p.is_dir()
+                || p.extension()
+                    .and_then(|ext| ext.to_str())
+                    .map(|ext| ext.eq_ignore_ascii_case("jar"))
+                    .unwrap_or(false)
+                || !p.exists() // Allow non-existent target directories that will be created
+        })
+        .collect();
+
+    let classpath = env::join_paths(valid_paths)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
 
     let classpath_str = classpath.to_string_lossy();

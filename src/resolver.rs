@@ -8,25 +8,25 @@ use tracing::{debug, info, instrument};
 use walkdir::WalkDir;
 
 use crate::cfg;
-use crate::manifest::Dependency;
+use crate::workspace::ResolvedDependency;
 
 #[instrument(name = "download_test", skip_all)]
-pub async fn download_test_dependencies(deps: &[Dependency]) -> Result<()> {
+pub async fn download_test_dependencies(deps: &[ResolvedDependency]) -> Result<()> {
     inner_download(deps, cfg::TEST_DEPENDENCIES_FOLDER).await
 }
 
 #[instrument(name = "download_main", skip_all)]
-pub async fn download(deps: &[Dependency]) -> Result<()> {
+pub async fn download(deps: &[ResolvedDependency]) -> Result<()> {
     inner_download(deps, cfg::DEPENDENCIES_FOLDER).await
 }
 
-async fn inner_download(deps: &[Dependency], target_folder: &str) -> Result<()> {
+async fn inner_download(deps: &[ResolvedDependency], target_folder: &str) -> Result<()> {
     let downloaded_files = list_download_files(target_folder).await?;
 
-    let artifacts = deps
+    let artifacts: Vec<ResolvedDependency> = deps
         .iter()
-        .filter(|it| !downloaded_files.contains(&it.file))
-        .collect::<Vec<_>>();
+        .filter_map(|dep| to_external(dep, &downloaded_files))
+        .collect();
 
     if artifacts.is_empty() {
         info!("All dependencies upto date");
@@ -40,42 +40,56 @@ async fn inner_download(deps: &[Dependency], target_folder: &str) -> Result<()> 
 
     let mut join_handles = Vec::new();
     for art in artifacts {
-        let coord = art.coordinate.clone();
-        let path = art.path.clone();
-        let jh = tokio::spawn(downloaded_file(coord, path, target_folder.to_string()));
-        join_handles.push(jh);
+        if let ResolvedDependency::External {
+            coordinate,
+            local_jar_path,
+            ..
+        } = &art
+        {
+            let coord = coordinate.clone();
+            let path = local_jar_path.clone();
+            let jh = tokio::spawn(downloaded_file(coord, path, target_folder.to_string()));
+            join_handles.push(jh);
+        }
     }
 
+    let mut total_count = 0;
     for jh in join_handles {
-        jh.await??;
+        let count = jh.await??;
+        total_count += count;
     }
 
     let tt = start.elapsed().as_secs();
-    info!("Downloaded {} dependencies in {} seconds", req_len, tt);
+    info!("Downloaded {req_len} dependencies in {tt} seconds, {total_count} transitive dependencies");
 
     Ok(())
 }
 
-async fn downloaded_file(
-    coordinate: ArtifactCoordinate,
-    path: PathBuf,
-    target_folder: String,
-) -> Result<()> {
+fn to_external(dep: &ResolvedDependency, downloaded: &HashSet<String>) -> Option<ResolvedDependency> {
+    match dep {
+        ResolvedDependency::External { file_name, .. } if !downloaded.contains(file_name) => Some(dep.clone()),
+        _ => None,
+    }
+}
+
+async fn downloaded_file(coordinate: ArtifactCoordinate, path: PathBuf, target_folder: String) -> Result<usize> {
     let resolver = Resolver::builder().build()?;
 
     debug!("downloading file {:?}", path);
     let req = ResolutionRequest::new(coordinate);
 
     let resolution = resolver.resolve(&req).await?;
-    for dependency in resolution.transitive_dependencies() {
+    let transitive_deps = resolution.transitive_dependencies();
+    for dependency in &transitive_deps {
         debug!("{}: {:?}", dependency.coordinate, dependency.status);
     }
+
     let report = resolver
         .download(&resolution, &FileDestination::new(target_folder))
         .await?;
 
     debug!("downloaded {} artifacts", report.artifacts.len());
-    Ok(())
+    Ok(transitive_deps.len())
 }
 
 pub async fn list_download_files(path: &str) -> Result<HashSet<String>> {

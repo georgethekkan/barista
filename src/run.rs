@@ -7,10 +7,10 @@ use tracing::info;
 use crate::{
     cfg,
     io_util::{join_paths, list_files},
-    manifest::Dependency,
+    workspace::Workspace,
 };
 
-pub async fn run(_dependencies: Vec<Dependency>, main_class: &str) -> Result<()> {
+pub async fn run(main_class: &str, app_args: &[String], _ws: &Workspace) -> Result<()> {
     let mut jar_paths = list_files(cfg::DEPENDENCIES_FOLDER).await?;
     jar_paths.insert(0, PathBuf::from(cfg::CLASSES_FOLDER));
     let classpath_str = join_paths(&jar_paths)?;
@@ -19,23 +19,23 @@ pub async fn run(_dependencies: Vec<Dependency>, main_class: &str) -> Result<()>
 
     info!("--------------");
 
-    let mut child = Command::new("java")
-        .arg("-cp")
+    let mut cmd = Command::new("java");
+    cmd.arg("-cp")
         .arg(&classpath_str)
-        .arg(main_class) // Example: "com.example.App"
-        .spawn()?; // Use .spawn() to let the program interact with the terminal natively
+        .arg(main_class)
+        .args(app_args);
 
+    let mut child = cmd.spawn()?; // Use .spawn() to let the program interact with the terminal natively
     let status = child.wait()?;
 
     info!("--------------");
 
     if status.success() {
-        info!(
-            "Java application exited successfully, took {}ms",
-            start.elapsed().as_millis()
-        );
+        let ts = start.elapsed().as_millis();
+        info!("Java application exited successfully, took {ts}ms");
         Ok(())
     } else {
-        bail!("Java application exited with error code: {:?}", status.code());
+        let code = status.code().unwrap_or_default();
+        bail!("Java application exited with error code: {code}");
     }
 }

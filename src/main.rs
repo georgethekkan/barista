@@ -1,6 +1,9 @@
 use ::tracing::{debug, info};
-use anyhow::Result;
-use barista::{args, clean, tracing};
+use anyhow::{Ok, Result};
+use barista::{
+    args::{self, Cli},
+    clean, tracing,
+};
 use tokio::time::Instant;
 
 #[tokio::main]
@@ -12,14 +15,20 @@ async fn main() -> Result<()> {
 
     debug!("Starting");
 
+    run(cli).await?;
+
+    info!("Finished in {} ms", start.elapsed().as_millis());
+
+    Ok(())
+}
+
+pub async fn run(cli: Cli) -> Result<()> {
     use args::Commands::*;
     match cli.command {
-        Build => barista::build(vec![]).await?,
+        Build => barista::build().await?,
         Run { bin_args } => barista::run(&bin_args).await?,
         Clean => clean()?,
     }
-
-    info!("Finished in {} ms", start.elapsed().as_millis());
 
     Ok(())
 }

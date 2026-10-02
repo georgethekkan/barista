@@ -7,9 +7,10 @@ use tracing::info;
 use crate::{
     cfg,
     io_util::{join_paths, list_files},
+    workspace::Workspace,
 };
 
-pub async fn run() -> Result<()> {
+pub async fn run(_ws: &Workspace) -> Result<()> {
     let mut test_deps = list_files(cfg::TEST_DEPENDENCIES_FOLDER).await?;
     test_deps.insert(0, PathBuf::from(cfg::TEST_CLASSES_FOLDER));
     test_deps.insert(0, PathBuf::from(cfg::CLASSES_FOLDER));

@@ -7,8 +7,15 @@ java_version = "25"
 [dependencies]
 slf4j-api = { id = "org.slf4j:slf4j-api:2.0.18", exclusions = ["something:something"] }
 logback-classic = "ch.qos.logback:logback-classic:1.6.3"
+spring-boot-starter-web = "org.springframework.boot:spring-boot-starter-web:4.1.0"
 
 [dev-dependencies]
 junit-jupiter = "org.junit.jupiter:junit-jupiter:5.10.0"
 junit-platform-console-standalone = "org.junit.platform:junit-platform-console-standalone:1.10.0"
 assertj-core = "org.assertj:assertj-core:3.25.3"
+
+[workspace]
+members = [
+    "app",
+    "shared",
+]

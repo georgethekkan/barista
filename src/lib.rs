@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use anyhow::{Context, Ok, Result, anyhow};
 
-use crate::manifest::{Dependency, Manifest};
+use crate::workspace::Workspace;
 
 pub mod args;
 pub mod build;
@@ -13,6 +13,7 @@ pub mod resolver;
 pub mod run;
 mod test_runner;
 pub mod tracing;
+pub mod workspace;
 
 pub fn clean() -> Result<()> {
     if !Path::new(cfg::TARGET_FOLDER).exists() {
@@ -22,41 +23,49 @@ pub fn clean() -> Result<()> {
     fs::remove_dir_all(cfg::TARGET_FOLDER).context("error deleting target folder")
 }
 
-pub async fn build(args: Vec<String>) -> Result<()> {
-    let (_mf, _deps) = inner_build(&args).await?;
-    test_runner::run().await?;
+pub async fn load_workspace(path: &str) -> Result<Workspace> {
+    Workspace::from_root_dir(path, cfg::CONFIG_FILE)
+}
+
+pub async fn build() -> Result<()> {
+    let ws = inner_build().await?;
+    test_runner::run(&ws).await?;
 
     Ok(())
 }
 
-pub async fn run(args: &[String]) -> Result<()> {
-    let (mf, deps) = inner_build(args).await?;
+pub async fn run(bin_args: &[String]) -> Result<()> {
+    let ws = inner_build().await?;
 
-    let main_class = args
-        .first()
-        .map(String::as_str)
-        .or(mf.package.main_class.as_deref())
-        .ok_or_else(|| {
-            anyhow!("No main class provided and no default configured in barista.toml")
-        })?;
+    let configured_main = ws.root_manifest.package.main_class.as_deref();
+    let (main_class, app_args) = match configured_main {
+        Some(main) => (main, bin_args),
+        None => {
+            let (first, rest) = bin_args
+                .split_first()
+                .ok_or_else(|| anyhow!("No main class provided and no default configured in barista.toml"))?;
+            (first.as_str(), rest)
+        }
+    };
 
-    run::run(deps, main_class).await?;
+    run::run(main_class, app_args, &ws).await?;
     Ok(())
 }
 
-async fn inner_build(_args: &[String]) -> Result<(Manifest, Vec<Dependency>)> {
-    let mf = manifest::load()?;
+async fn inner_build() -> Result<Workspace> {
+    let ws = load_workspace(cfg::ROOT_DIR).await?;
 
-    let deps = mf.dependencies();
-    let dev_deps = mf.dev_dependencies();
+    let main_deps = ws.all_external_dependencies();
+    let dev_deps = ws.all_external_dev_dependencies();
 
     tokio::try_join!(
-        resolver::download(&deps),
+        resolver::download(&main_deps),
         resolver::download_test_dependencies(&dev_deps),
     )?;
 
-    build::build(&deps, cfg::DEPENDENCIES_FOLDER).await?;
-    build::build_test(&dev_deps, cfg::TEST_DEPENDENCIES_FOLDER).await?;
+    // Trigger compilation steps
+    build::build(&ws).await?;
+    build::build_test(&ws).await?;
 
-    Ok((mf, deps))
+    Ok(ws)
 }
