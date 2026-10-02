@@ -6,7 +6,6 @@ use crate::workspace::Workspace;
 
 pub mod args;
 pub mod build;
-pub mod cfg;
 pub mod io_util;
 pub mod manifest;
 pub mod resolver;
@@ -59,10 +58,12 @@ async fn inner_build() -> Result<Workspace> {
 
     let main_deps = ws.all_external_dependencies();
     let dev_deps = ws.all_external_dev_dependencies();
+    let deps_dir = ws.dependencies_dir();
+    let test_deps_dir = ws.test_dependencies_dir();
 
     tokio::try_join!(
-        resolver::download(&main_deps, &ws.dependencies_dir()),
-        resolver::download(&dev_deps, &ws.test_dependencies_dir()),
+        resolver::download(&main_deps, &deps_dir),
+        resolver::download(&dev_deps, &test_deps_dir),
     )?;
 
     // Trigger compilation steps

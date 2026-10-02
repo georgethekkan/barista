@@ -1,16 +1,22 @@
-use std::{env, path::PathBuf};
+use std::{
+    env,
+    io::ErrorKind,
+    path::{Path, PathBuf},
+};
+
+use std::io::Error as StdError;
 
 use anyhow::{Ok, Result};
 use tracing::debug;
 use walkdir::WalkDir;
 
-pub fn list_files<P: AsRef<std::path::Path>>(path: P) -> Result<Vec<PathBuf>> {
+pub fn list_files<P: AsRef<Path>>(path: P) -> Result<impl Iterator<Item = PathBuf>> {
     let files = WalkDir::new(path)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|entry| entry.file_type().is_file())
-        .map(|entry| entry.into_path())
-        .collect();
+        .map(|entry| entry.into_path());
+
     Ok(files)
 }
 
@@ -29,8 +35,7 @@ pub fn join_paths(paths: &[PathBuf]) -> Result<String> {
         })
         .collect();
 
-    let classpath = env::join_paths(valid_paths)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+    let classpath = env::join_paths(valid_paths).map_err(|e| StdError::new(ErrorKind::InvalidInput, e))?;
 
     let classpath_str = classpath.to_string_lossy();
     debug!("Generated classpath: {}", classpath_str);
@@ -38,7 +43,7 @@ pub fn join_paths(paths: &[PathBuf]) -> Result<String> {
     Ok(classpath_str.to_string())
 }
 
-pub fn build_classpath(class_dirs: &[&std::path::Path], jar_dirs: &[&std::path::Path]) -> Result<String> {
+pub fn build_classpath(class_dirs: &[&Path], jar_dirs: &[&Path]) -> Result<String> {
     let mut paths = Vec::new();
     for dir in class_dirs {
         paths.push(dir.to_path_buf());

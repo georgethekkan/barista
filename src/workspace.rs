@@ -37,15 +37,18 @@ impl FromStr for Exclusion {
 #[derive(Debug, Clone)]
 pub enum ResolvedDependency {
     /// A verified third-party external Maven package
-    External {
-        name: String,
-        coordinate: ArtifactCoordinate,
-        exclusions: Vec<Exclusion>,
-        local_jar_path: PathBuf,
-        file_name: String,
-    },
+    External(ExternalDependency),
     /// A structured pointer to another internal module inside this workspace
     InternalModule { name: String, absolute_path: PathBuf },
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternalDependency {
+    pub name: String,
+    pub coordinate: ArtifactCoordinate,
+    pub exclusions: Vec<Exclusion>,
+    pub local_jar_path: PathBuf,
+    pub file_name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -123,7 +126,7 @@ impl Workspace {
     }
 
     /// Returns all unique external runtime dependencies across the root and members
-    pub fn all_external_dependencies(&self) -> Vec<ResolvedDependency> {
+    pub fn all_external_dependencies(&self) -> Vec<ExternalDependency> {
         extract_unique_external(
             self.dependencies
                 .iter()
@@ -132,7 +135,7 @@ impl Workspace {
     }
 
     /// Returns all unique external development dependencies across the root and members
-    pub fn all_external_dev_dependencies(&self) -> Vec<ResolvedDependency> {
+    pub fn all_external_dev_dependencies(&self) -> Vec<ExternalDependency> {
         extract_unique_external(
             self.dev_dependencies
                 .iter()
@@ -173,15 +176,11 @@ impl Workspace {
     }
 }
 
-fn extract_unique_external<'a>(
-    deps: impl IntoIterator<Item = &'a ResolvedDependency>,
-) -> Vec<ResolvedDependency> {
+fn extract_unique_external<'a>(deps: impl IntoIterator<Item = &'a ResolvedDependency>) -> Vec<ExternalDependency> {
     let mut seen = HashSet::new();
     deps.into_iter()
         .filter_map(|dep| match dep {
-            ResolvedDependency::External { coordinate, .. } => {
-                seen.insert(coordinate.to_string()).then(|| dep.clone())
-            }
+            ResolvedDependency::External(ext) => seen.insert(ext.coordinate.to_string()).then(|| ext.clone()),
             _ => None,
         })
         .collect()
@@ -225,7 +224,7 @@ fn resolve_dependencies(
 pub fn to_resolved_dependency(name: &str, config: &DependencyConfig, base_dir: &Path) -> Result<ResolvedDependency> {
     use DependencyConfig::*;
     match config {
-        Simple(coord) => resolve_external(name, coord, Vec::new()),
+        Simple(coord) => Ok(ResolvedDependency::External(resolve_external(name, coord, Vec::new())?)),
 
         Detailed {
             id: Some(coord),
@@ -236,7 +235,11 @@ pub fn to_resolved_dependency(name: &str, config: &DependencyConfig, base_dir: &
                 .iter()
                 .map(|s| s.parse::<Exclusion>())
                 .collect::<Result<Vec<_>>>()?;
-            resolve_external(name, coord, parsed_exclusions)
+            Ok(ResolvedDependency::External(resolve_external(
+                name,
+                coord,
+                parsed_exclusions,
+            )?))
         }
 
         Detailed { path: Some(_), .. } => {
@@ -254,7 +257,7 @@ pub fn to_resolved_dependency(name: &str, config: &DependencyConfig, base_dir: &
     }
 }
 
-fn resolve_external(name: &str, coord_str: &str, exclusions: Vec<Exclusion>) -> Result<ResolvedDependency> {
+fn resolve_external(name: &str, coord_str: &str, exclusions: Vec<Exclusion>) -> Result<ExternalDependency> {
     let (group, id, version) = to_artifact_coordinate(coord_str)?;
 
     let coordinate = ArtifactCoordinate::new(group, id, version)?;
@@ -265,7 +268,7 @@ fn resolve_external(name: &str, coord_str: &str, exclusions: Vec<Exclusion>) -> 
         .unwrap_or("")
         .to_string();
 
-    Ok(ResolvedDependency::External {
+    Ok(ExternalDependency {
         name: name.into(),
         coordinate,
         exclusions,

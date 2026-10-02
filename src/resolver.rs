@@ -5,21 +5,26 @@ use anyhow::{Ok, Result};
 use ristretto_resolver::{ArtifactCoordinate, FileDestination, ResolutionRequest, Resolver};
 use tokio::time::Instant;
 use tracing::{debug, info, instrument};
-use walkdir::WalkDir;
 
-use crate::workspace::ResolvedDependency;
+use crate::io_util;
+use crate::workspace::ExternalDependency;
 
 #[instrument(name = "download_dependencies", skip_all)]
-pub async fn download(deps: &[ResolvedDependency], target_dir: &Path) -> Result<()> {
+pub async fn download(deps: &[ExternalDependency], target_dir: &Path) -> Result<()> {
     inner_download(deps, target_dir).await
 }
 
-async fn inner_download(deps: &[ResolvedDependency], target_dir: &Path) -> Result<()> {
-    let downloaded_files = list_download_files(target_dir)?;
+async fn inner_download(deps: &[ExternalDependency], target_dir: &Path) -> Result<()> {
+    let downloaded = io_util::list_files(target_dir)?
+        .into_iter()
+        .map(|p| p.file_name().and_then(|n| n.to_str()).map(|s| s.to_string()))
+        .flatten()
+        .collect::<HashSet<_>>();
 
-    let artifacts: Vec<ResolvedDependency> = deps
+    let artifacts: Vec<ExternalDependency> = deps
         .iter()
-        .filter_map(|dep| to_external(dep, &downloaded_files))
+        .filter(|dep| !downloaded.contains(&dep.file_name))
+        .cloned()
         .collect();
 
     if artifacts.is_empty() {
@@ -35,18 +40,11 @@ async fn inner_download(deps: &[ResolvedDependency], target_dir: &Path) -> Resul
     let mut join_handles = Vec::new();
     let target_path_buf = target_dir.to_path_buf();
     for art in artifacts {
-        if let ResolvedDependency::External {
-            coordinate,
-            local_jar_path,
-            ..
-        } = &art
-        {
-            let coord = coordinate.clone();
-            let path = local_jar_path.clone();
-            let dest = target_path_buf.clone();
-            let jh = tokio::spawn(downloaded_file(coord, path, dest));
-            join_handles.push(jh);
-        }
+        let coord = art.coordinate.clone();
+        let path = art.local_jar_path.clone();
+        let dest = target_path_buf.clone();
+        let jh = tokio::spawn(downloaded_file(coord, path, dest));
+        join_handles.push(jh);
     }
 
     let mut total_count = 0;
@@ -56,16 +54,9 @@ async fn inner_download(deps: &[ResolvedDependency], target_dir: &Path) -> Resul
     }
 
     let tt = start.elapsed().as_secs();
-    info!("Downloaded {req_len} dependencies in {tt} seconds, {total_count} transitive dependencies");
+    info!("Downloaded {req_len} dependencies, {total_count} transitive dependencies in {tt} seconds");
 
     Ok(())
-}
-
-fn to_external(dep: &ResolvedDependency, downloaded: &HashSet<String>) -> Option<ResolvedDependency> {
-    match dep {
-        ResolvedDependency::External { file_name, .. } if !downloaded.contains(file_name) => Some(dep.clone()),
-        _ => None,
-    }
 }
 
 async fn downloaded_file(coordinate: ArtifactCoordinate, path: PathBuf, target_dir: PathBuf) -> Result<usize> {
@@ -86,15 +77,4 @@ async fn downloaded_file(coordinate: ArtifactCoordinate, path: PathBuf, target_d
 
     debug!("downloaded {} artifacts", report.artifacts.len());
     Ok(transitive_deps.len())
-}
-
-pub fn list_download_files<P: AsRef<Path>>(path: P) -> Result<HashSet<String>> {
-    let file_names = WalkDir::new(path)
-        .into_iter()
-        .filter_map(Result::ok)
-        .filter(|e| e.file_type().is_file())
-        .filter_map(|e| e.file_name().to_os_string().into_string().ok())
-        .collect();
-
-    Ok(file_names)
 }
