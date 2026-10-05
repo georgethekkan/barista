@@ -38,8 +38,8 @@ pub async fn build() -> Result<()> {
 pub async fn run(bin_args: &[String]) -> Result<()> {
     let ws = inner_build().await?;
 
-    let configured_main = ws.root_manifest.package.main_class.as_deref();
-    let (main_class, app_args) = match configured_main {
+    let mail_class = ws.root_manifest.package.main_class.as_deref();
+    let (main_class, app_args) = match mail_class {
         Some(main) => (main, bin_args),
         None => {
             let (first, rest) = bin_args
@@ -66,7 +66,6 @@ async fn inner_build() -> Result<Workspace> {
         resolver::download(&dev_deps, &test_deps_dir),
     )?;
 
-    // Trigger compilation steps
     build::build(&ws)?;
     build::build_test(&ws)?;
 
